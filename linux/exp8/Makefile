@@ -1,4 +1,4 @@
-.PHONY: fs run clean
+.PHONY: all fs run clean
 obj-m += timer_mod.o
 
 CURRENT_PATH := $(shell pwd)

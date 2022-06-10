@@ -1,3 +1,4 @@
+.PHONY: all clean install unistall
 obj-m += myWorkqueue.o
 
 CURRENT_PATH := $(shell pwd)
@@ -8,8 +9,9 @@ all:
 	make -C $(LINUX_KERNEL_PATH) M=$(CURRENT_PATH) modules
 clean:
 	make -C $(LINUX_KERNEL_PATH) M=$(CURRENT_PATH) clean
-check:
-	@insmod myWorkqueue.ko && sleep 8
+install:
+	@insmod myWorkqueue.ko && sleep 3
+unistall:
 	@rmmod myWorkqueue
 	@dmesg | tail -n 20
 	

@@ -1,4 +1,4 @@
-.PHONY: fs run clean
+.PHONY: all fs run clean
 obj-m += chrdev_driver.o
 
 CURRENT_PATH := $(shell pwd)
