@@ -1,0 +1,13 @@
+#!/bin/busybox sh
+
+# make symbolic links
+for cmd in $(busybox --list); do
+    /bin/busybox ln -s /bin/busybox /bin/$cmd
+done
+
+# make proc sys
+mkdir -p /proc && mount -t proc  none /proc
+mkdir -p /sys  && mount -t sysfs none /sys
+
+# begin
+/bin/busybox sh

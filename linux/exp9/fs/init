@@ -1,0 +1,20 @@
+#!/bin/busybox sh
+
+# make symbolic links
+for cmd in $(busybox --list); do
+    /bin/busybox ln -s /bin/busybox /bin/$cmd
+done
+
+# make proc sys
+mkdir -p /proc && mount -t proc  none /proc
+mkdir -p /sys  && mount -t sysfs none /sys
+
+# install module
+insmod chrdev_driver.ko
+MAJOR=$(awk '{if($2=="test") print $1}' /proc/devices)
+mknod /dev/test c $MAJOR 0
+
+# begin
+/bin/busybox sh
+
+
