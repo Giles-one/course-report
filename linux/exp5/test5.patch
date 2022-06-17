@@ -1,0 +1,91 @@
+diff -uNr linux-5.15/arch/x86/entry/syscalls/syscall_64.tbl linux-5.15_new/arch/x86/entry/syscalls/syscall_64.tbl
+--- linux-5.15/arch/x86/entry/syscalls/syscall_64.tbl	2021-11-01 04:53:10.000000000 +0800
++++ linux-5.15_new/arch/x86/entry/syscalls/syscall_64.tbl	2022-06-15 06:53:25.060065685 +0800
+@@ -343,6 +343,9 @@
+ 332	common	statx			sys_statx
+ 333	common	io_pgetevents		sys_io_pgetevents
+ 334	common	rseq			sys_rseq
++335	common	get_proc_run_time	sys_get_proc_run_time
++
++
+ # don't use numbers 387 through 423, add new calls after the last
+ # 'common' entry
+ 424	common	pidfd_send_signal	sys_pidfd_send_signal
+diff -uNr linux-5.15/include/linux/syscalls.h linux-5.15_new/include/linux/syscalls.h
+--- linux-5.15/include/linux/syscalls.h	2021-11-01 04:53:10.000000000 +0800
++++ linux-5.15_new/include/linux/syscalls.h	2022-06-15 06:56:06.305352713 +0800
+@@ -72,6 +72,9 @@
+ struct landlock_ruleset_attr;
+ enum landlock_rule_type;
+ 
++/* structure of my own syscall */
++struct cpu_time_struct;
++
+ #include <linux/types.h>
+ #include <linux/aio_abi.h>
+ #include <linux/capability.h>
+@@ -1030,6 +1033,9 @@
+ 			  unsigned mask, struct statx __user *buffer);
+ asmlinkage long sys_rseq(struct rseq __user *rseq, uint32_t rseq_len,
+ 			 int flags, uint32_t sig);
++/* my own syscall */
++asmlinkage long sys_get_proc_run_time(pid_t pid, struct cpu_time_struct *cpu_time);
++
+ asmlinkage long sys_open_tree(int dfd, const char __user *path, unsigned flags);
+ asmlinkage long sys_move_mount(int from_dfd, const char __user *from_path,
+ 			       int to_dfd, const char __user *to_path,
+diff -uNr linux-5.15/kernel/sys.c linux-5.15_new/kernel/sys.c
+--- linux-5.15/kernel/sys.c	2021-11-01 04:53:10.000000000 +0800
++++ linux-5.15_new/kernel/sys.c	2022-06-15 06:56:27.041518212 +0800
+@@ -270,6 +270,51 @@
+  * has been offset by 20 (ie it returns 40..1 instead of -20..19)
+  * to stay compatible.
+  */
++
++extern struct cpu_time_struct {
++	unsigned long utime;
++	unsigned long stime;
++};
++
++/* my own syscall */
++
++SYSCALL_DEFINE2(get_proc_run_time, pid_t, pid, struct cpu_time_struct *, cpu_time)
++{
++	pid_t sys_pid;
++	struct cpu_time_struct *sys_cpu_time;
++	struct task_struct *p = NULL;
++
++	if (!access_ok(cpu_time, sizeof(struct cpu_time_struct)))
++		return -EFAULT;
++	
++	sys_cpu_time = kmalloc(sizeof(struct cpu_time_struct), GFP_KERNEL);
++	if (sys_cpu_time == NULL)
++		return -ENOMEM;
++	
++	sys_pid = pid;
++	p = find_task_by_vpid(sys_pid);
++	if (p == NULL)
++	{
++		printk(KERN_EMERG "find task error");
++		kfree(sys_cpu_time);
++		return -EFAULT;
++	}
++	
++	get_cpu();
++	sys_cpu_time->utime = p->utime;
++	sys_cpu_time->stime = p->stime;
++	put_cpu();
++
++	if (copy_to_user(cpu_time, sys_cpu_time, sizeof(struct cpu_time_struct)))
++	{
++		kfree(sys_cpu_time);
++		return -EFAULT;
++	}
++	kfree(sys_cpu_time);
++	return 0;
++}
++
++
+ SYSCALL_DEFINE2(getpriority, int, which, int, who)
+ {
+ 	struct task_struct *g, *p;
