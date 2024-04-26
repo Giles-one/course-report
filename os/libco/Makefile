@@ -1,4 +1,4 @@
-.PHONY: all git test clean commit-and-make run
+.PHONY: all git test clean commit-and-make run bytecode
 
 NAME := $(shell basename $(PWD))
 export MODULE := M2
@@ -15,6 +15,10 @@ run: $(NAME)-64 $(NAME)-32
 	./$(NAME)-64
 	@echo =====$(NAME)-32=====
 	./$(NAME)-32
+
+bytecode:
+	as --64 bytecode64.S && objdump -d | grep '^ ' | awk -F':\t' '{print $$2}'
+	as --32 bytecode32.S && objdump -d | grep '^ ' | awk -F':\t' '{print $$2}'
 
 $(NAME)-64: $(DEPS) # 64bit binary
 	gcc -m64 $(CFLAGS) $(SRCS) -o $@ $(LDFLAGS)

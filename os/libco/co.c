@@ -31,61 +31,45 @@ struct co {
 struct co* current = NULL;
 
 __attribute__ ((section(".text"))) uint8_t bytecode[] = {
+// make bytecode
 #ifdef __x86_64__
-    0x48, 0x8b, 0x0c, 0x24, // mov    (%rsp),%rcx
-    0x48, 0x89, 0xe0,       // mov    %rsp,%rax
-    0x48, 0x89, 0xfc,       // mov    %rdi,%rsp
-    0x51,                   // push   %rcx         ; save (RBX, RBP, R12-R15) (SP, PC)
-    0x50,                   // push   %rax
-    0x41, 0x57,             // push   %r15
-    0x41, 0x56,             // push   %r14
-    0x41, 0x55,             // push   %r13
-    0x41, 0x54,             // push   %r12
-    0x55,                   // push   %rbp
-    0x53,                   // push   %rbx
-    0x48, 0x89, 0xd7,       // mov    %rdx,%rdi
-    0xff, 0xd6,             // callq  *%rsi        ; entry(arg) 
-    0x5b,                   // pop    %rbx         ; restore (RBX, RBP, R12-R15) (SP, PC)
-    0x5d,                   // pop    %rbp
-    0x41, 0x5c,             // pop    %r12
-    0x41, 0x5d,             // pop    %r13
-    0x41, 0x5e,             // pop    %r14
-    0x41, 0x5f,             // pop    %r15
-    0x58,                   // pop    %rax
-    0x59,                   // pop    %rcx
-    0x48, 0x89, 0xc4,       // mov    %rax,%rsp
-    0x58,                   // pop    %rax
-    0xff, 0xe1,             // jmpq   *%rcx
-    0xcc, 0xcc, 0xcc        // breakpoint
+// (void *sp /*rdi*/, void *entry /*rsi*/, uintptr_t arg /*rdx*/)
+    0x58,                      // pop    %rax
+    0x48, 0x89, 0xe1,          // mov    %rsp,%rcx
+    0x48, 0x89, 0xfc,          // mov    %rdi,%rsp
+    0x51,                      // push   %rcx      ; save (SP, PC)
+    0x50,                      // push   %rax
+    0x48, 0x89, 0xd7,          // mov    %rdx,%rdi
+    0xff, 0xd6,                // callq  *%rsi
+    0x58,                      // pop    %rax      ; restore (PC, SP)
+    0x5c,                      // pop    %rsp
+    0xff, 0xe0,                // jmpq   *%rax
+    0xcc,                      // int3   
 #else
-    0x89, 0xe0,             // mov    %esp,%eax
-    0x8b, 0x10,             // mov    (%eax),%edx
-    0x8b, 0x60, 0x04,       // mov    0x4(%eax),%esp
-    0x52,                   // push   %edx         ; save (BX, SI, DI, BP) (SP, PC)
-    0x50,                   // push   %eax
-    0x55,                   // push   %ebp
-    0x57,                   // push   %edi
-    0x56,                   // push   %esi
-    0x53,                   // push   %ebx
-    0x8b, 0x50, 0x0c,       // mov    0xc(%eax),%edx
-    0x52,                   // push   %edx
-    0x8b, 0x50, 0x08,       // mov    0x8(%eax),%edx
-    0xff, 0xd2,             // call   *%edx        ; entry(arg)
-    0x5a,                   // pop    %edx         ; restore (BX, SI, DI, BP) (SP, PC)
-    0x5b,                   // pop    %ebx
-    0x5e,                   // pop    %esi
-    0x5f,                   // pop    %edi
-    0x5d,                   // pop    %ebp
-    0x58,                   // pop    %eax
-    0x5a,                   // pop    %edx
-    0x89, 0xc4,             // mov    %eax,%esp
-    0x58,                   // pop    %eax
-    0xff, 0xe2,             // jmp    *%edx
-    0xcc, 0xcc              // breakpoint 
+// (void *sp, void *entry, uintptr_t arg)
+// |     arg     | esp + 12
+// |    entry    | esp + 8
+// |     sp      | esp + 4
+// | return addr | <- esp
+    0x89, 0xe1,                // mov    %esp,%ecx
+    0x8b, 0x01,                // mov    (%ecx),%eax
+    0x8b, 0x61, 0x04,          // mov    0x4(%ecx),%esp
+    0x51,                      // push   %ecx
+    0x50,                      // push   %eax
+    0x8b, 0x41, 0x0c,          // mov    0xc(%ecx),%eax
+    0x50,                      // push   %eax
+    0x8b, 0x41, 0x08,          // mov    0x8(%ecx),%eax
+    0xff, 0xd0,                // call   *%eax
+    0x58,                      // pop    %eax
+    0x58,                      // pop    %eax
+    0x5c,                      // pop    %esp
+    0x59,                      // pop    %ecx
+    0xff, 0xe0,                // jmp    *%eax
+    0xcc,                      // int3
 #endif
 };
 
-void (*stack_switch_call)(void *sp /*rdi*/, void *entry /*rsi*/, uintptr_t arg /*rdx*/) = (void*)(bytecode);
+void (*stack_switch_call)(void *sp, void *entry, uintptr_t arg) = (void*)(bytecode);
 
 
 struct co *co_start(const char *name, void (*func)(void *), void *arg) {
